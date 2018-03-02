@@ -1,0 +1,199 @@
+/* html body */
+body {
+	margin: 0;
+	padding: 0;
+	background-color: white;
+}
+
+a {
+	color: orangered;
+}
+
+a:hover {
+	color: white;
+}
+
+/* the div that holds the svg element*/
+#map {
+	position: absolute;
+	top: 0px;
+	left: 0px;
+	right: 270px;
+	bottom: 0px;
+	overflow: hidden;
+}
+
+/* basic settings for entire SVG element */
+svg {
+	background-color: gray;
+	width: 100%;
+	top: 0px;
+	bottom: 0px;
+	left: 0px;
+	right: 0px;
+}
+
+/* map settings */
+.land_boundaries {
+	fill: #303030;
+	stroke: gray;
+	stroke-width: 1px;
+}
+
+/* default circle settings */
+circle {
+	fill-opacity: .8;
+	stroke: white;
+	stroke-width: 1px;
+	opacity: .5;
+}
+
+circle:hover {
+	stroke: purple;
+	fill-opacity: .8;
+	stroke-width: 1px;
+	opacity: .5;
+}
+
+.dot.target.year {
+	stroke: purple;
+	fill-opacity: .8;
+	stroke-width: 1px;
+	opacity: .5;
+	display: contents;
+}
+
+.dot.target {
+	stroke: blue;
+}
+
+.dot.year {
+	stroke: red;
+}
+
+.not_year {
+	display: none;
+}
+
+.not_target {
+	display: none;
+}
+
+/* class that makes data 50% visible */
+.data_visible {
+	opacity: .5;
+}
+
+/* class that hides data */
+.data_hidden {
+	display: none;
+}
+
+.overlay {
+	fill: none;
+	pointer-events: all;
+}
+
+.select {
+	color: orangered;
+}
+
+/* customize the horizontal rule tag */
+hr {
+	border: 0;
+	border-bottom: 1px solid gray;
+}
+
+/* div that holds all of the various texts on the right */
+#texts {
+	position: absolute;
+	right: 0px;
+	width: 249px;
+    top: 0px;
+    bottom: 0px;
+	padding: 10px;
+	font-size: 12pt;
+	background-color: #252525;
+	font-family: "Crimson Text";
+	border-left: 1px solid gray;
+	color: orangered;
+}
+
+#title {
+	font-size: 19pt;
+	font-family: "Creepster";
+}
+
+#author {
+	font-family: "Creepster";
+	font-size: 12pt;
+	font-style: italic;
+	letter-spacing: 1px;
+}
+
+
+/* text for the legend removed .label so the title is included */
+#legend {
+		font-family: "Creepster" !important;
+    font-size: 14pt;
+		fill: silver;
+	pointer-events: none; /* ignore mouse clicks */
+}
+
+#legend .label {
+		font-family: "Creepster" !important;
+    font-size: 14pt;
+		fill: white;
+	pointer-events: none; /* ignore mouse clicks */
+}
+
+/* this makes it so that whenever it zooms in, the strokes will not also scale as well */
+path,circle {
+    vector-effect: non-scaling-stroke;
+}
+
+/* text caption labels */
+.label {
+	font-family: "Crimson Text";
+	opacity: .4;
+	fill: white;
+	font-size: 14pt;
+	pointer-events: none; /* ignore mouse clicks */
+}
+.label_point {
+	stroke: none;
+	pointer-events: none; /* ignore mouse clicks */
+}
+
+.captions {
+	fill: purple;
+}
+
+
+/* applied to data when mouse is over */
+.highlight {
+    stroke-width: 4px;
+    opacity: 1.0;
+}
+
+/* a nifty little CSS animation that makes a big stroke become normal again */
+.selected {
+    stroke: purple;
+    animation: selectanim 200ms ease;
+    stroke-width: 8px;
+}
+@keyframes selectanim {
+  from { stroke-width: 500px; }
+  to { stroke-width: 4px; }
+}
+
+/* caption for the tooltip */
+#tooltip {
+	margin-top: 1em;
+	font-size: 10pt;
+}
+
+/* the little control that lets you "look up" data */
+#dataLocator {
+	width: 250px; /*select controls often need explicit widths set or they can get too big*/
+}

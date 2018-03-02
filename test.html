@@ -1,0 +1,92 @@
+<html>
+  <head>
+    <title>
+      Sample Title
+    </title>
+    <link href="https://fonts.googleapis.com/css?family=Noto+Serif|Playfair+Display|Playfair+Display+SC" rel="stylesheet">
+    <linke href="style.css" type="text/css" rel="stylesheet"/>
+    <style>
+      body {
+        font-family: "Playfair Display SC", Curlz, "Helvetica Neue", Helvetica, Arial;
+        width: 65%;
+        min-width: 500px;
+      }
+      p {
+        font-size: 20px;
+      }
+      h2 {
+        letter-spacing: 2px;
+        text-transform: uppercase;
+      }
+      a {
+        color: red;
+        text-decoration: none;
+      }
+      a:hover {
+        color: green;
+        text-decoration: underline;
+        border-bottom: 1px solid red;
+      }
+      #label1 {
+        background-color !important: salmon;
+      }
+      .class1 {
+        font-size: 12px;
+        padding-left: 350px;
+      }
+      #div2 {
+        background-color: salmon;
+      }
+    </style>
+  </head>
+  <script>
+    // this is a loosely typed variable
+    var var1 = "hurray";
+    var var2 = 10;
+    var var3 = "5";
+    alert(bees(var2, var3));
+
+    function bees(bee1, bee2) {
+      return parseInt(bee1) + parseInt(bee2);
+    }
+
+    function init() {
+      for(var i = 0; i < 10; i++) {
+        // alert(i);
+        document.getElementById('label1').innerHTML += i;
+      }
+    }
+
+    function clicked(what) {
+      document.getElementById("div1").innerHTML = what;
+    }
+
+    function notthebees() {
+      var thebees = document.getElementById("thebees");
+      var r = Math.floor(Math.random() * 200);
+      thebees.style.paddingLeft= r+"px";
+    }
+
+    //on mousemove sounds like something to abuse
+
+  </script>
+  <body onload=init()>
+    <h2> Welcome to this page! </h2>
+    <p id="label1">
+      Nicolas Cage stole the <a href="https://en.wikipedia.org/wiki/United_States_Declaration_of_Independence"> declaration of independence </a> while wearing a track suit. National Treasure is a bad movie...
+    </p>
+  <img id="thebees" src = "images/nickcage.gif" onmousemove="notthebees();"/>
+    <p>
+      Nicolas Cage is a <strong> bee-hater </strong> and is considered <i> controvertial </i>.
+    </p>
+    <div class="class1" id="div1">
+      This is a div. <span> This is a span. </span>
+    </div>
+    <div class="class1" id="div2">
+      This is a div. <span> This is a span. </span>
+    </div>
+    <div class="class1" id="div3">
+      This is a div. <span> This is a span. </span>
+    </div>
+  </body>
+</html>

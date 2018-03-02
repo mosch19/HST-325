@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Flexible data template</title>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=10" />
+<link rel="stylesheet" type="text/css" href="examples.css"></link>
+<script src="http://vizsociety.net/shared/d3/d3.v3.min.js"></script>
+<script src="http://vizsociety.net/shared/d3/topojson.v1.min.js"></script>
+<script src="http://vizsociety.net/shared/d3/d3.geo.projection.v0.min.js"></script>
+<script src="http://vizsociety.net/shared/js/jquery-1.10.2.js"></script>
+<script src="http://vizsociety.net/shared/js/shared.js"></script>
+<script src="../lib/d3viz.js"></script>
+
+<script type="text/javascript">
+/* Flexible D3.js global data viewer — by Alex Wellerstein, 2015-2016, v2.0 */
+	
+/* MAP OPTIONS */
+
+//creates a new D3 JSON map object
+var map = new d3SVGMap({
+	div: "#map",
+	width: 960,
+	height: window.innerHeight,
+	mapfile: "../json/nyc.json",
+	projection_name: "mercator",
+	projection_rotate: [73.94,-40.7,0],
+	projection_scale: 90000,
+	projection_translate: [960/2,window.innerHeight/2],
+	onload: function() {	
+		//this designates what the "tooltip" is going to be
+		map.tooltip = d3.select("#texts")
+					.append("div")
+					.attr("id","tooltip")
+					.text("");
+	}
+});
+
+
+var debug = false; //turn this on if you want it to shoot messages to the console as it does stuff
+var debug_verbose = false; //turn this on if you want a LOT of messages shot to the console
+
+/* DATA SPECIFIC OPTIONS -- you need to tailor these to your dataset */
+
+// NOTE! Anytime you see something like d["something here"], this means
+// that you are referencing a column in the CSV file. The script is smart
+// enough so that it knows that if you put d["something here"] you mean,
+// "access the data in the column whose header (first entry) is 'something here'."
+// So to adapt this to another dataset, you must know the column heads, and find
+// the places in the template below to change it to your own column headings.
+
+//Here is where you should put the data files, in csv format. 
+//You can use more than one, as an array, just give it a different number (arrays count from 0, 1, 2, etc.)
+
+//the data file constructor — used for lots of things. You can have more than one, just copy and paste and update the index.
+
+var museumData = new d3Data({
+	name: "NYC Museums",
+	csv: "../data/NYCGO_museums_20and_20galleries_001.csv",
+	latLon: function(d) { return [ parseFloat(d["lat"]), parseFloat(d["lon"]) ] }
+})
+
+var popData = new d3Data({
+	name: "Ambient population density within 20 miles of NYC",
+	csv: "../data/landscan_nyc_20mi.csv",
+	latLon: function(d) { return [ parseFloat(d["lat"]), parseFloat(d["lon"]) ]}
+})
+
+
+/* END DATA-SPECIFIC OPTIONS */
+
+
+//if you want to load any template additional scripts, do it here 
+</script>
+<script src="../lib/data_datacircles.js"></script>
+<script src="../lib/data_heatmap.js"></script>
+<script src="../lib/mouse_zoomer.js"></script>
+<script type="text/javascript"> 
+//begin main functions:
+
+//initialization functions go here
+
+var heatmap = new SVGHeatmap({
+	map: map,
+	data: popData,
+	val: function(d) { return d["pop"]; },
+	max: 50000,
+	min: 0,
+	radius: 15,
+	debug: true,
+})
+
+var circles = new dataCircles({
+	map: map,
+	data: museumData,
+	radius_selector_options: [
+		["Adult price", function(d) { return +d["adult_price"]}],
+		["Fixed: 1", function(d) { return 1; }],
+		["Fixed: 2", function(d) { return 2; }],
+		["Fixed: 5", function(d) { return 5; }],
+		["Fixed: 10", function(d) { return 10; }]
+	],
+	circle_class: "circledata",
+	radius_selector_default: 0,
+	radius_selector_caption: "Set radius: ",
+	color_field: "adult_price",
+	color_scale: d3.scale.linear().domain([0,24]).range(["green", "red"]), //d3 color function
+	mouseover_caption: 		//function that determines the caption that is displayed when the mouse hovers over a datapoint
+		function(d) {
+			return "<b><big>"+d["name"] + "</big></b><br>"
+					+d["address"]+"<br>"
+					+d["closing"]+"<br>"
+					+ "Rates: "+d["rates"]+"<br>"
+					+ "Specials: "+d["specials"]+"<br>"
+				;
+			},
+})
+
+var zoomer = new mouseZoomer({
+	map: map,
+	zoom_if_clicked: ["circle","path"],
+	zoom_to_centroid: false,
+	zoom_transition_speed: 700,	
+})
+	
+//function to re-render the heatmap
+function updateHeatmap() {
+	heatmap.radius = +document.getElementById("heatmapRadius").value; //get the new radius
+	heatmap.reload(); //doing this will reload all of the existing settings, plus any you have changed, and replace the image already made
+}
+
+
+//startup (runs after all elements/scripts/etc. on the page have loaded)
+function init() {
+
+	//magic!
+	d3VizObj.load();
+		
+}
+window.onload = init;
+
+</script>
+</head>
+<body>
+	<div id="map"></div>
+	<div id="texts">
+		<div id="title">New York City Museums</div>
+		<div id="author">by Alex Wellerstein</div>
+		<hr>
+		<div id="options">
+		Heatmap radius: <input type="range" id="heatmapRadius" min="1" max="50" value="15" onchange="updateHeatmap()" />
+		</div>
+		<p>
+		A heatmap is essentially a raster graphic that is rendered and then superimposed onto the image. In this case, we've just gotten data about population density (generated with <a href="http://vizsociety.net/tools/popmap/">this tool</a>). 
+	</div>
+</body>
+</html>

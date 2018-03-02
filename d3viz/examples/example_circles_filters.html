@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Flexible data template</title>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=10" />
+<link rel="stylesheet" type="text/css" href="examples.css"></link>
+<script src="http://vizsociety.net/shared/d3/d3.v3.min.js"></script>
+<script src="http://vizsociety.net/shared/d3/topojson.v1.min.js"></script>
+<script src="http://vizsociety.net/shared/d3/d3.geo.projection.v0.min.js"></script>
+<script src="http://vizsociety.net/shared/js/jquery-1.10.2.js"></script>
+<script src="http://vizsociety.net/shared/js/shared.js"></script>
+<script src="../lib/d3viz.js"></script>
+
+<script type="text/javascript">
+/* Flexible D3.js global data viewer — by Alex Wellerstein, 2015-2016, v2.0 */
+
+/* MAP OPTIONS */
+
+//creates a new D3 JSON map object
+var map = new d3SVGMap({
+	div: "#map",
+	width: 960,
+	height: window.innerHeight,
+	mapfile: "../json/nyc.json",
+	projection_name: "mercator",
+	projection_rotate: [73.94,-40.7,0],
+	projection_scale: 90000,
+	projection_translate: [960/2,window.innerHeight/2],
+	onload: function() {
+		//this designates what the "tooltip" is going to be
+		map.tooltip = d3.select("#texts")
+					.append("div")
+					.attr("id","tooltip")
+					.text("");
+	}
+});
+
+
+var debug = false; //turn this on if you want it to shoot messages to the console as it does stuff
+var debug_verbose = false; //turn this on if you want a LOT of messages shot to the console
+
+/* DATA SPECIFIC OPTIONS -- you need to tailor these to your dataset */
+
+// NOTE! Anytime you see something like d["something here"], this means
+// that you are referencing a column in the CSV file. The script is smart
+// enough so that it knows that if you put d["something here"] you mean,
+// "access the data in the column whose header (first entry) is 'something here'."
+// So to adapt this to another dataset, you must know the column heads, and find
+// the places in the template below to change it to your own column headings.
+
+//Here is where you should put the data files, in csv format.
+//You can use more than one, as an array, just give it a different number (arrays count from 0, 1, 2, etc.)
+
+//the data file constructor — used for lots of things. You can have more than one, just copy and paste and update the index.
+
+var museumData = new d3Data({
+	name: "NYC Museums",
+	csv: "../data/NYCGO_museums_20and_20galleries_001.csv",
+	latLon: function(d) { return [ parseFloat(d["lat"]), parseFloat(d["lon"]) ] }
+})
+
+/* END DATA-SPECIFIC OPTIONS */
+
+
+//if you want to load any template additional scripts, do it here
+</script>
+<script src="../lib/data_datacircles.js"></script>
+<script src="../lib/filter_data.js"></script>
+<script src="../lib/mouse_zoomer.js"></script>
+<script type="text/javascript">
+//begin main functions:
+
+//initialization functions go here
+
+var circles = new dataCircles({
+	map: map,
+	data: museumData,
+	radius_selector_options: [
+		["Adult price", function(d) { return +d["adult_price"]}],
+		["Fixed: 1", function(d) { return 1; }],
+		["Fixed: 2", function(d) { return 2; }],
+		["Fixed: 5", function(d) { return 5; }],
+		["Fixed: 10", function(d) { return 10; }]
+	],
+	circle_class: "circledata",
+	radius_selector_default: 0,
+	radius_selector_caption: "Set radius: ",
+	color_field: "adult_price",
+	color_scale: d3.scale.linear().domain([0,24]).range(["green", "red"]), //d3 color function
+	mouseover_caption: 		//function that determines the caption that is displayed when the mouse hovers over a datapoint
+		function(d) {
+			return "<b><big>"+d["name"] + "</big></b><br>"
+					+d["address"]+"<br>"
+					+d["closing"]+"<br>"
+					+ "Rates: "+d["rates"]+"<br>"
+					+ "Specials: "+d["specials"]+"<br>"
+				;
+			},
+})
+
+var zoomer = new mouseZoomer({
+	map: map,
+	zoom_if_clicked: ["circle","path"],
+	zoom_to_centroid: false,
+	zoom_transition_speed: 700,
+})
+
+//text filter -- filters data objects based on searching for text in a data field
+var text_filter = new dataFilter({
+
+	filter_type: FILTERTYPE_TEXTSEARCH,
+
+	//these options tell how the toggle menu should appear in the code
+	selector_caption: "Show museums closed on: (text filter) ",
+	//array of arrays for the selector. first item is a caption, second is either a value to search for, OR a function.
+	//the function will pass two variables. the first (t, below) is the formatted text to search for. the second (d, below) is the full data item.
+	//if the function returns true, it is marked as "found." if "false" then as "lacks."
+	selector_options: [
+		["All dates", 0], //returning 0 removes all filtering
+		["Sunday", "Sunday"],
+		["Monday", "Monday"],
+		["Tuesday", "Tuesday"],
+		["Wednesday", "Wednesday"],
+		["Thursday", "Thursday"],
+		["Friday", "Friday"],
+		["Saturday", "Saturday"],
+		["Thanksgiving or Christmas",
+			function(t,d) {
+				if(t.indexOf("thanksgiving")>-1 || t.indexOf("christmas")>-1) {
+					return true;
+				} else {
+					return false;
+				}
+			}
+		]
+	],
+	selector_selected: 0, //default option on list
+	selector_id: "options", //id of the HTML object you want to create the keyword filter select inside of
+
+	filter_field: "closing", //the field in the CSV file
+	filter_target: ".circledata", //the svg selector of your data to have this filtering act on
+	case_insensitive: true, //will turn everything lowercase before comparing
+
+	found_class: "data_hidden", //the class that is applied to the svg class if the text is found
+	lacks_class: "", //the class that is applied if it is not found (either can be blank)
+
+})
+
+var keywords_filter = new dataFilter({
+
+	filter_type: FILTERTYPE_KEYWORDS,
+
+	//these options tell how the toggle menu should appear in the code
+	selector_caption: "Show museums closed on: (keyword filter) ",
+	//array of arrays for the selector. first item is a caption, second is either a value to search for, OR a function.
+	//the function will pass two variables. the first (t, below) is the formatted text to search for. the second (d, below) is the full data item.
+	//if the function returns true, it is marked as "found." if "false" then as "lacks."
+	selector_options: [
+		["All dates", 0], //returning 0 removes all filtering
+		["Operation", "Operation"],
+		["Battle", "Battle"],
+		["Offensive", "Offensive"]
+	],
+	selector_selected: 0, //default option on list
+	selector_id: "options", //id of the HTML object you want to create the keyword filter select inside of
+
+	delimiter: " ", //character that splits fields up
+
+	filter_field: "major_op", //the field in the CSV file
+	filter_target: ".circledata", //the svg selector of your data to have this filtering act on
+	case_insensitive: true, //will turn everything lowercase before comparing
+
+	found_class: "", //the class that is applied to the svg class if the text is found
+	lacks_class: "data_hidden", //the class that is applied if it is not found (either can be blank)
+
+})
+
+
+//range filters let you see if a numerical value is within a range
+var range_filter = new dataFilter({
+
+	filter_type: FILTERTYPE_RANGE, //range filter
+
+	//these options tell how the toggle menu should appear in the code
+	selector_caption: "Price: ",
+	//array of arrays for the selector. first item is a caption, second is either a value to search for, OR a function.
+	//for range options, he second value is an array of the form [min,max]. if either is false, treats it as < or >.
+	//so [false,5] means <5, and [20,false] means >20
+	selector_options: [
+		["All prices", 0], //returning 0 removes all filtering
+		["Free", [0,0] ],
+		["Under $5", [false,5] ],
+		["Under $10",[false,10] ],
+		["Between $5 and $10", [5,10] ],
+		["Between $10 and $20", [10,20] ],
+		["Over $20", [20,false] ],
+		["Between $5 and $10 but not $9", function(v,d) { //just a dumb example of a function
+			if(v>5 && v<10 && v!=9) {
+				return true;
+			} else {
+				return false;
+			}
+		}]
+	],
+	selector_selected: 0, //default option on list
+	selector_id: "options", //id of the HTML object you want to create the keyword filter select inside of
+
+	filter_field: "adult_price", //the field in the CSV file
+	filter_target: ".circledata", //the svg selector of your data to have this filtering act on
+
+	found_class: "", //the class that is applied to the svg class if the text is found
+	lacks_class: "data_hidden", //the class that is applied if it is not found (either can be blank)
+
+})
+
+var custom_filter = new dataFilter({
+
+	filter_type: FILTERTYPE_USERDEFINED, //totally custom filter
+
+	//for the userdefined filter, we have to provide our own filter function
+	//it will be fed the relevance piece of data for the specified filter_field (data_field),
+	//the value of the selector chosen (data_value), and the full data object (d)
+	//in this very silly example, it just searches for the word "museum."
+	filter_function: function(data_field, data_value, d) {
+		switch(data_value) {
+			case 1:
+				if(data_field.indexOf("museum")>-1) {
+					return true;
+				} else {
+					return false;
+				}
+			break;
+			case 2:
+				if(data_field.indexOf("museum")>-1) {
+					return false;
+				} else {
+					return true;
+				}
+			break;
+		}
+
+	},
+
+	selector_options: [
+		["All places", 0], //returning 0 removes all filtering
+		["Only 'museums'",1],
+		["Not 'museums'",2],
+	],
+	selector_selected: 0, //default option on list
+	selector_id: "options", //id of the HTML object you want to create the keyword filter select inside of
+
+	filter_field: "name", //the field in the CSV file
+	filter_target: ".circledata", //the svg selector of your data to have this filtering act on
+	case_insensitive: true, //will turn everything lowercase before comparing
+
+	found_class: "", //the class that is applied to the svg class if the text is found
+	lacks_class: "data_hidden", //the class that is applied if it is not found (either can be blank)
+
+})
+
+
+//startup (runs after all elements/scripts/etc. on the page have loaded)
+function init() {
+
+	//magic!
+	d3VizObj.load();
+
+
+
+}
+window.onload = init;
+
+</script>
+</head>
+<body>
+	<div id="map"></div>
+	<div id="texts">
+		<div id="title">New York City Museums</div>
+		<div id="author">by Alex Wellerstein</div>
+		<hr>
+		<div id="options"></div>
+	</div>
+</body>
+</html>

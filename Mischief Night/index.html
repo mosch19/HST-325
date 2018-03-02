@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Mischief Night Mischief</title>
+<link rel="icon" href="jackolantern.png">
+<meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css?family=Creepster|Crimson+Text" rel="stylesheet">
+<link rel="stylesheet" type="text/css" href="style.css"></link>
+<script src="http://vizsociety.net/shared/d3/d3.v3.min.js"></script>
+<script src="http://vizsociety.net/shared/d3/topojson.v1.min.js"></script>
+<script src="http://vizsociety.net/shared/d3/d3.geo.projection.v0.min.js"></script>
+<script src="http://vizsociety.net/shared/d3/d3-legend.min.js"></script>
+<script src="http://vizsociety.net/shared/js/jquery-1.10.2.js"></script>
+<script src="http://vizsociety.net/shared/js/shared.js"></script>
+<script src="misc.js"></script>
+<script type="text/javascript">
+
+/* Simple D3.js global data viewer — by Alex Wellerstein, 2017, v2.0 */
+
+/* GLOBAL OPTIONS -- you might want to change, but you don't need to */
+
+//global variables
+var width = 960,
+	height = window.innerHeight,
+	maxlat = 90; //clips the maximum north/south latitudes
+
+var debug = true; //turn this on if you want it to shoot messages to the console as it does stuff
+
+/* END GLOBAL OPTIONS */
+
+/* DATA SPECIFIC OPTIONS -- you need to tailor these to your dataset */
+
+// NOTE! Anytime you see something like d["something here"], this means
+// that you are referencing a column in the CSV file. The script is smart
+// enough so that it knows that if you put d["something here"] you mean,
+// "access the data in the column whose header (first entry) is 'something here'."
+// So to adapt this to another dataset, you must know the column headings, and find
+// the places in the template below to change it to your own column headings.
+
+/* data source settings */
+var data_source = {
+	//the data file (csv format)
+	csv: "mischief night.csv",
+
+	//function that tells the map how to parse latitude/longitude data from the file -- should return an array of [lat,lon]
+	latLon: function(d) { return [parseFloat(d["Latitude"]),parseFloat(d["Longitude"])] },
+
+	//this function will run every time a data row is loaded for the first time -- useful for making sure it understands what is a number or not
+	/*preprocess: function(d) {
+		d["adult_price"] = parseFloat(d["adult_price"]); //in this case, we make sure the "adult_price" field is understood as a float
+		return d; //pass the data back
+	},
+	*/
+}
+
+/* map specific settings */
+var map_source = {
+	//geojson or topojson file that describes the land shape
+	mapfile: "nyc.json",
+
+	//map projection -- for a list of possible projections, take a look at http://vizsociety.net/shared/js/projectionlist.js -- for a very zoomed-in map, doesn't matter much
+	projection_id: "mercator",
+
+
+	//rotates the world first horizontally and then vertically, must be an array of three coordinates
+	projection_rotate: [73.94,-40.7,0],
+
+	//the zoom factor -- play around to get this how you want it
+	projection_scale: 95000,
+
+	// how to translate (move) the map -- doing width/2, height/2 centers it in the window
+	projection_translate: [(width) / 2, (height)/1.9],
+
+	maxlat: 90, //clips the maximum north/south latitudes (doesn't matter for this map scale)
+
+}
+
+/* zoom settings -- controls what happens if you click on the map to zoom */
+var zoom_settings = {
+	zoom_on_click: true, //set this to false if you want to disable zooming!
+	zoomed_factor_med: 3, //the level of zoom to zoom "in" to, if you click on a landform or something without a "positions" property -- 3 = 300% -- can be changed in your code
+	zoomed_factor_high: 5, //the level of zoom that occurs if the object in question has a "positions" property
+}
+
+/* data circles -- maps data onto circles */
+/* requires all data to have lat/lon coordinates, can also map radii and color to data */
+
+var data_circle_options = {
+
+	circle_class: "dot", //class assigned to all data circles
+	circle_id_prefix: "c_", //every data object will get a unique id, this is the prefix for it (e.g. c_1, c_2)
+
+	selectorId: "radiusSelect", //id of the SELECT tag to change the radius (if there is one)
+
+	//this is an array-of-arrays, with each "line" below consisting of a label and the value for the circle radius for if that line is chosen.
+	//if the value is a function, the function will be passed the data row, and its results will be used to set the value of the radius.
+	selector_options: [
+		["Days to resovle", function(d) {
+			if (+d["Diff"] > 50) {
+				return 30;
+			} else {
+				return 5 + +d["Diff"]/2.5;
+			}}],
+		["Fixed: 5", 5 ],
+		["Fixed: 10", 10 ],
+	],
+	selector_selected: 0, //which radius is selected (serves as default)
+
+	//sets the color of the fill. here, we have it set to a specific field (which requires the settings below it), but if we made it just "return 'blue';" it would make it just blue, for example.
+	fill_color: function(d) {
+		return this.color_scale(d[this.color_field]);
+	},
+
+	//for color set by data, put a field name in here:
+	color_field: "Severity",
+	//this is the type of d3 scale that will be used -- see quantitative, ordinal, or time scales here: https://github.com/d3/d3-3.x-api-reference/blob/master/Scales.md
+	scale_function: d3.scale.linear(),
+	//this is a function that maps the scale onto colors. we keep this separate so we can change it based on dynamic updates, if we want
+	color_scale: function(d) {
+		data_circle_options.scale_function.domain([
+					d3.min(data_source.data.map(function(d) { return +d[data_circle_options.color_field]; })), //minimum for field
+					d3.max(data_source.data.map(function(d) { return +d[data_circle_options.color_field]; })) //maximum for field
+				])
+				.range(["yellow", "orangered"]); //you could change these colors or add more
+		return this.scale_function(d);
+	},
+
+	//this creates a legend based on the color scales above -- you don't want a legend, just delete it!
+	//how to use: http://d3-legend-v3.susielu.com/
+	color_legend: function() {
+		d3.select("#legend").call(
+			d3.legend.color()
+			  .cells(5)
+				.title("Degree of Charge")
+			  .shapeWidth(50)
+			  .orient("vertical")
+			  .scale(this.scale_function)
+				.labels(["4th", "3rd", "2nd", "2nd/3rd", "1st"])
+				.ascending(true)
+		);
+	},
+
+	//this is text for the caption when data is highlighted or selected
+	caption: function(d) {
+		return "<b><big>Target: "+d["PREM_TYP_DESC"] + "</big></b><br>"
+			+ "Address: "+d["Address"]+"<br>"
+			+ "Charge: "+d["PD_DESC"]+"<br>"
+			+ "Category: "+d["LAW_CAT_CD"]+"<br>"
+			+ "Jurisdiction: "+d["JURIS_DESC"]+"<br>"
+			+ "Days to resolve: "+d["Diff"]+"<br>"
+			+ "Year: "+d["Year"]+"<br>"
+			;
+	},
+
+	//misc settings:
+	radius_add: 0, //a raw radius addition that is added to any radius calculation
+	radius_min: 2, //minimum radius
+	autosort: true, //automatically sort circles by radius so small ones are on top
+
+}
+
+
+// text field filters -- allows you to filter data based on a field full of text.
+// if used, it will search for a given piece of text in a given field. if the text is present, it will assign the class "data_has_text", if it doesn't, it will assign the class "data_lacks_text".
+// if you don't want to use this, just delete it -- it should be fine
+var text_filter_options = {
+
+	filter_field: "PREM_TYP_DESC", //the name of the field in the data
+
+	filter_class: "dot", //the base class of the d3 data object being filtered
+
+	//this is an array-of-arrays, with each "line" below consisting of a label and the text to search for if that line is chosen.
+	//if the text to search for is the number 0, it will not search for any text (that is the 'default' state).
+	//if the text to search for is a function, it will instead pass the data text to the function -- this is a way to
+	//  override the default activity, as illustrated below.
+
+	selectorId: "textFilterSelector", //the id of the SELECT tag to make a selector out of
+
+	selector_options: [
+		["Any",0],
+		["Residences","residence"],
+		["Churches/Worship", "church"],
+		["Businesses", function(val) {
+			var business = ["restaurant", "bodega", "gas", "food", "salon", "private", "commercial", "store", "bank", "laundry", "bar", "gym", "merchant", "photo"];
+			for (i = 0; i < business.length; i++) {
+					if(val.indexOf(business[i])>-1) {
+						return true;
+					}
+			}
+			// outside the loop meaning none of the true criteria were met
+			return false;
+		}],
+		["Public Area", function(val) {
+			if(val.indexOf("public")>-1 || val.indexOf("playground")>-1) {
+				return true;
+			} else {
+				return false;
+			}}],
+		["Roads", function(val) {
+			if(val.indexOf("street")>-1 || val.indexOf("highway")>-1 || val.indexOf("tunnel")>-1) {
+				return true;
+			} else {
+				return false;
+			}
+		}],
+		["Transit", function(val) {
+			var transit = ["subway", "bus", "taxi", "airport"];
+			for (i = 0; i < transit.length; i++) {
+				if (val.indexOf(transit[i])>-1) {
+					return true;
+				}
+			}
+			// outside the loop meaning none of the true criteria were merchant
+			return false;
+		}],
+		["Unspecified Location", "other"]
+	],
+
+	selector_selected: 0, //default selector option -- 0 is the first, 1 is the second, etc.
+
+	//a function that will be run on every line of the filter field before the comparison is made
+	//in this example, it converts it to lower case so that the comparison is case-insensitive
+	before_comparing: function(text) { return text.toLowerCase(); },
+
+	//class names added if the data has the text or if it doesn't
+	text_found_class: "target", //in this case, I want to hide the data if the text is found -- this might not be what you want! consider the logic of it!!!
+	text_lacks_class: "not_target",   //in this case, I want to do nothing if it isn't
+
+}
+// CURRENTLY APPLYING THE SAME SEARCH AS ABOVE...
+var text_filter_options2 = {
+
+	filter_field: "Year", //the name of the field in the data
+
+	filter_class: "dot", //the base class of the d3 data object being filtered
+
+	//this is an array-of-arrays, with each "line" below consisting of a label and the text to search for if that line is chosen.
+	//if the text to search for is the number 0, it will not search for any text (that is the 'default' state).
+	//if the text to search for is a function, it will instead pass the data text to the function -- this is a way to
+	//  override the default activity, as illustrated below.
+
+	selectorId: "textFilterSelector2", //the id of the SELECT tag to make a selector out of
+
+	selector_options: [
+		["Any",0],
+		["2014", 2014],
+		["2015", 2015],
+		["2016", 2016]
+	],
+
+	selector_selected: 0, //default selector option -- 0 is the first, 1 is the second, etc.
+
+	//a function that will be run on every line of the filter field before the comparison is made
+	//in this example, it converts it to lower case so that the comparison is case-insensitive
+	before_comparing: function(value) { return value.toLowerCase(); },
+	//class names added if the data has the text or if it doesn't
+	text_found_class: "year", //in this case, I want to hide the data if the text is found -- this might not be what you want! consider the logic of it!!!
+	text_lacks_class: "not_year",   //in this case, I want to do nothing if it isn't
+
+}
+
+
+/* creates a little SELECT element that lists all of the data and highlights any given one if you select it*/
+
+var data_finder = {
+
+	selectorId: "dataLocator", //the id of the SELECT tag to use for this
+
+	selector_default_caption: "Locate a datapoint...", //the "default" data caption
+
+	sort_field: "PREM_TYP_DESC", //if you need to sort the data, it sorts it by this field
+
+	sort_desc: false, //if this is true, it will sort descending
+
+	selector_data_caption: function(d) { //this is the caption that will populate the SELECT options
+		return d["PREM_TYP_DESC"] + " (" + d["BORO_NM"] + ")";
+	},
+
+	//lastly, this is the code that is run whenever a given piece of data is selected
+	//in the example below, it just adds the "selected" class to any data that is selected, and gives it info in the tooltip
+	selector_select: function(id) {
+		svg.selectAll("."+data_circle_options.circle_class) //unselect all
+			.classed("selected",false);
+		if(id) { //select the id
+			svg.select("#"+data_circle_options.circle_id_prefix+(id))
+				.classed("selected",true);
+			for(var i in data_source.data) {
+				if(data_source.data[i].id==id) { //shows the caption of the datapoint selected (it has to search for it, because the data might be sorted)
+					tooltip.html(data_circle_options.caption(data_source.data[i]));
+					break;
+				}
+			}
+
+		}
+	},
+
+}
+
+/* a little settings to add some manual capt */
+var text_captions = {
+	manual_captions: [
+		["Manhattan",40.79,-74.05],
+		["Brooklyn",40.64,-73.98],
+		["The Bronx",40.84,-73.91],
+		["Queens",40.71,-73.84],
+		["Staten Island",40.58,-74.18],
+	],
+}
+
+/* END DATA-SPECIFIC OPTIONS */
+
+//d3 global objects -- don't touch, don't edit, don't add to
+var svg, stage, captions, projection, path, circles, tooltip, landforms, centered;
+
+//begin main functions:
+
+//startup (runs after all elements/scripts/etc. on the page have loaded)
+function init() {
+	//set up projection
+	map_source.projection = d3.geo[map_source.projection_id]() //sets which projection (uses project_id from up above)
+		.rotate(map_source.projection_rotate) //rotates the world
+		.scale(map_source.projection_scale) 			 //sets the zoom factor
+		.translate(map_source.projection_translate); //moves the map
+
+	//create a path object to manipulate
+	path = d3.geo.path()
+		.projection(map_source.projection);
+
+	//create the svg object
+	svg = d3.selectAll('#map')
+	.append('svg')
+		.attr('width',width)
+		.attr('height',height)
+		.attr("viewBox","0 0 "+width+" "+height) //this last line makes it resize along with the browser window
+	;
+
+	//create a group for all of the stuff to go inside the SVG (this is so we can resize them all at once)
+	stage = svg.append("g").attr("id","stage");
+
+	//create landforms group, append to svg object
+	landforms = stage.append("g").attr("id","landforms");
+
+	//create a generic group on top of the landforms, but under data, that we can add captions to
+	captions = stage.append("g").attr("id","captions");
+
+	//add a group into the SVG file, give it the id "circles"
+	circles = stage.insert("svg:g").attr("id", "circles");
+
+	//add a group for the legend
+	stage.insert("svg:g").attr("id", "legend").attr("transform", "translate(20,20)");
+
+	//this designates what the "tooltip" is going to be
+	tooltip = d3.select("#texts")
+				.append("div")
+				.attr("id","tooltip")
+				.text("");
+
+	//make the radii selector from options
+	if(typeof data_circle_options.selector_options != "undefined") {
+		var sel = document.getElementById(data_circle_options.selectorId);
+		for(i in data_circle_options.selector_options) {
+			var opt = document.createElement("option");
+			opt.text = data_circle_options.selector_options[i][0];
+			opt.value = i;
+			if(i==data_circle_options.selector_selected) opt.selected = true;
+			sel.add(opt);
+		}
+		sel.onchange = function() { changeradius(document.getElementById(data_circle_options.selectorId).value) };
+	}
+
+	//make the text filter selector from options
+	if(typeof text_filter_options != "undefined") {
+		if(text_filter_options.selectorId) {
+			if(typeof document.getElementById(text_filter_options.selectorId) != "undefined") {
+				var sel = document.getElementById(text_filter_options.selectorId);
+				for(i in text_filter_options.selector_options) {
+					var opt = document.createElement("option");
+					opt.text = text_filter_options.selector_options[i][0];
+					opt.value = i;
+					if(i==text_filter_options.selector_selected) opt.selected = true;
+					sel.add(opt);
+				}
+				sel.onchange = function() { textFilter(document.getElementById(text_filter_options.selectorId).value, text_filter_options) };
+			} else {
+				if(debug) console.log("Text filter selector id does not refer to any element in the DOM!");
+			}
+		} else {
+			if(debug) console.log("Text filter options exist, but no selector id is indicated!");
+		}
+	}
+
+	//	SECOND ONE
+	if(typeof text_filter_options2 != "undefined") {
+		if(text_filter_options2.selectorId) {
+			if(typeof document.getElementById(text_filter_options2.selectorId) != "undefined") {
+				var sel = document.getElementById(text_filter_options2.selectorId);
+				for(i in text_filter_options2.selector_options) {
+					var opt = document.createElement("option");
+					opt.text = text_filter_options2.selector_options[i][0];
+					opt.value = i;
+					if(i==text_filter_options2.selector_selected) opt.selected = true;
+					sel.add(opt);
+				}
+				sel.onchange = function() { textFilter(document.getElementById(text_filter_options2.selectorId).value, text_filter_options2) };
+			} else {
+				if(debug) console.log("Text filter selector id does not refer to any element in the DOM!");
+			}
+		} else {
+			if(debug) console.log("Text filter options exist, but no selector id is indicated!");
+		}
+	}
+
+	//load the map form
+	d3.json(map_source.mapfile, function(error, world) {
+		//this "switch" just makes this compatible with the two main types of map files
+		switch(world.type) {
+			case "FeatureCollection":
+			landforms.append("g")
+				.selectAll(".land_boundaries")
+				.data(world.features)
+				.enter().append("path")
+				.attr("class", function(d){ return d.properties.name; })
+				.attr("class", "land_boundaries")
+				.attr("d", path)
+	  			.on("click", zoom_it)
+	  			;
+			break;
+			case "Topology":
+			  landforms.append("path")
+				  .datum(topojson.feature(world, world.objects.land))
+				  .attr("class", "land_boundaries")
+				  .attr("d", path)
+	  			  .on("click", zoom_it)
+				  ;
+			  landforms.append("path")
+				  .datum(topojson.feature(world, world.objects.countries))
+				  .attr("class", "country_boundaries")
+				  .attr("d", path)
+	  			  .on("click", zoom_it)
+				  ;
+			 break;
+		}
+	});
+
+	//load from the CSV file into the array object
+	//you probably don't need to or want to change anything here
+	if(debug) console.log("Trying to load data from "+data_source.csv);
+	d3.csv(data_source.csv, function(datarows) {
+		if(datarows == null) alert("Could not load the file "+data_source.csv+" - check that the file path and permissions are valid");
+		var i = 0; //just a blank index to iterate
+		data_source.data = []; //a variable within our datasource to hold our data
+		datarows.forEach(function(d) { //for each data row in the CSV file
+			d.id = parseInt(i); //keep track of what row number it is
+			if(debug) console.log("Parsing item "+i);
+			//parse latlng positions
+			if(typeof data_source.latLon == "function") {
+				var ll = data_source.latLon(d);
+				if(isNaN(ll[0])||isNaN(ll[1])) {
+					if(debug) console.log("Lat/lng data for row "+i+" is invalid or blank -- ignoring it");
+				} else {
+					d.positions = map_source.projection([ll[1],ll[0]]); //create the pixel positions and add them to the data object
+				}
+			}
+			//run any preprocess functions
+			if(typeof data_source.preprocess == "function") {
+				d = data_source.preprocess(d);
+			}
+			if(debug) console.log("Adding data for row "+i+" at "+ll[0]+", "+ll[1]);
+			data_source.data.push(d);  //add the data object to a our data array
+			i++; //increase the row number counter
+		});
+		showdata(data_source.data); //all data is now loaded, so show it
+	});
+}
+
+//all of the data is loaded, so let's draw some things...
+function showdata(data) {
+	//create a circles class
+	if(typeof data_circle_options != "undefined") {
+		 circles.selectAll("circle")
+			.data(data) //use the data to draw the circles...
+			  .enter().append("svg:circle")
+				.attr("class", data_circle_options.circle_class) //set their class to the data circles class
+				.attr("id", function(d) { return data_circle_options.circle_id_prefix+d.id; }) //set an individual id for each circle
+				.attr("i", function(d) { return d.id; }) //same as the above but just a number -- sometime useful to have access to which number it is in the set
+				.attr("cx", function(d) { return d.positions[0]; }) //x position
+				.attr("cy", function(d) { return d.positions[1]; }) //y position
+				.on("mouseover", function(d) {  //what to do when the mouse goes over
+					d3.select(this).classed("highlight",true); //turn on highlight class
+					tooltip.html(data_circle_options.caption(d));
+					})
+				.on("mouseout",  function(d) { //what to do when the mouse is no longer over it
+					d3.select(this).classed("highlight",false); //turn it off
+					tooltip.html("");
+				})
+				.on("click", zoom_it) //zoom when clicked upon
+			;
+		changeradius(); //now we run the function that will update the radius
+		changecolor(); //now we run the function that will change the color
+	}
+
+	//add the manual captions, if there are any
+	if(typeof text_captions != "undefined") {
+		if(typeof text_captions.manual_captions != "undefined") {
+			for(var i in text_captions.manual_captions) {
+				add_caption_point(text_captions.manual_captions[i][1],text_captions.manual_captions[i][2],text_captions.manual_captions[i][0]);
+			}
+		}
+	}
+
+	//create the finder bar
+	if(typeof data_finder != "undefined") {
+		var sel = document.getElementById(data_finder.selectorId);
+		var opt = document.createElement("option");
+		opt.text = data_finder.selector_default_caption;
+		opt.value = "";
+		opt.selected = true;
+		sel.add(opt);
+
+		var data_copy = data_source.data;
+		if(data_finder.sort_field) {
+			data_copy.sort(function(a, b) { //this is a custom sort function that just sorts by a given field
+				return sort_it(a[data_finder.sort_field],b[data_finder.sort_field]);
+			});
+			if(data_finder.sort_desc) data_copy.reverse(); //reverse the data if desired
+		}
+		for(var i in data_copy) {
+			var d = data_copy[i];
+			if(typeof data_finder.selector_data_caption == "function") {
+				var opt = document.createElement("option");
+				opt.text = data_finder.selector_data_caption(d);
+				opt.value = d.id;
+				sel.add(opt);
+			}
+		}
+		sel.onchange = function() { data_finder.selector_select(document.getElementById(data_finder.selectorId).value) };
+	}
+
+}
+
+//make init() run on loading the window
+window.onload = init;
+</script>
+<body>
+	<div id="map"></div>
+	<div id="texts">
+		<div id="title">Criminal Mischief Charges on Mischief Night, NYC</div>
+		<div id="author">by: Spook Master</div>
+		<hr>
+		<select id="dataLocator" class="select"></select>
+		<hr>
+		Radius: <select id="radiusSelect" class="select"></select>
+		<hr>
+		Color: <input type="radio" value="Severity" name="color" onchange="changecolor(this.value)" checked> Severity <input type="radio" value="age" onchange="changecolor(this.value)" name="color" class="select"> None
+		<hr>
+		Target: <select id="textFilterSelector" class="select"></select>
+		<br> <br>
+		Year: <select id="textFilterSelector2" class="select"></select>
+		<hr>
+		<p>
+			<a href="https://en.wikipedia.org/wiki/Mischief_Night">Is it mischief night? Or cabbage night? goosey night? devils night?</a>
+		</p>
+		<hr>
+	</div>
+</body>
+</html>

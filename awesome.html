@@ -1,0 +1,141 @@
+<html>
+  <head>
+    <title>
+      Worlds most awesome website? You decide.
+    </title>
+    <link href="https://fonts.googleapis.com/css?family=Permanent+Marker" rel="stylesheet">
+    <style>
+      body {
+        font-family: "Permanent Marker";
+        background-image: url("rad.jpg");
+        padding-left: 100px;
+        background-color: grey;
+        width: 65%;
+        min-width: 1000px;
+      }
+      a {
+        color: purple;
+      }
+      a:hover {
+        color: teal;
+      }
+      .board {
+        padding-left: 100px;
+        margin: auto;
+        width: 500px;
+        height: 500px;
+      }
+      .cell {
+        width: 100px;
+        height: 100px;
+        outline: 1px solid;
+        float: left;
+        text-align: center;
+        background: white;
+      }
+      .info {
+        padding-left: 100px;
+        text-align: center;
+        font-size: 20px;
+      }
+      #title {
+        font-size: 25px;
+        color: red;
+      }
+      </style>
+
+      <script>
+
+        function currentCell(current) {
+          var color1 = Math.floor(Math.random() * 255) + 0;
+          var color2 = Math.floor(Math.random() * 255) + 0;
+          var color3 = Math.floor(Math.random() * 255) + 0;
+          current.style.backgroundColor = "rgb("+color1+","+color2+","+color3+")";
+          current.innerHTML = Math.floor((color1 + color2 + color3) / 3);
+          check();
+        }
+
+        function check() {
+          var prev;
+          for (i = 1; i < 25; i++) {
+            var sum = 0;
+            var current = document.getElementById(i.toString());
+            var x = current.style.backgroundColor;
+            // so you don't win right at start
+            if (current.style.backgroundColor == "") {
+              document.getElementById('status').innerHTML = 'Get rid of all the white space...';
+              return;
+            }
+            x = x.substring(4, x.length-1)
+            .replace(/ /g, '')
+            .split(',');
+            x.forEach(function (item) {
+              sum += parseInt(item);
+          })
+          sum /= 3;
+          // so you don't always lose
+          if (i === 1) {
+            prev = sum;
+          }
+          if (Math.abs((sum-prev)/prev) > 1) {
+            document.getElementById('status').innerHTML = 'Percent difference is too large...';
+            return;
+          }
+          prev = sum;
+          }
+          // fix font & background
+          document.getElementById('status').innerHTML = 'YOU ARE A WINNER!';
+          document.getElementById('status').style.fontWeight = "bold";
+          document.getElementById('title').style.color = "black";
+          document.body.style.fontFamily = "Helvetica";
+          document.body.style.backgroundImage = "none";
+          document.body.style.color = "black";
+          alert("YOU WIN!");
+        }
+      </script>
+  </head>
+
+  <body>
+    <h2 class="info" id="title">
+      Welcome to the stupidest game ever. Mouse over a square to change its color.
+    </h2>
+
+    <p class="info">
+      When the average value of RGB for each cell is within <strong> 100% </strong> of its <a href="https://en.wikipedia.org/wiki/Ned_Flanders"> neighbor </a> (adjacent right) you win! Then the font will become normal.
+    </p>
+
+    <p class="info" id="status">
+      STATUS
+    </p>
+
+  <div class="board">
+    <div class="cell" id="1"  onmouseover="currentCell(this);"></div>
+    <div class="cell" id="2"  onmouseover="currentCell(this);"></div>
+    <div class="cell" id="3"  onmouseover="currentCell(this);"></div>
+    <div class="cell" id="4"  onmouseover="currentCell(this);"></div>
+    <div class="cell" id="5"  onmouseover="currentCell(this);"></div>
+    <div class="cell" id="6"  onmouseover="currentCell(this);"></div>
+    <div class="cell" id="7"  onmouseover="currentCell(this);"></div>
+    <div class="cell" id="8"  onmouseover="currentCell(this);"></div>
+    <div class="cell" id="9"  onmouseover="currentCell(this);"></div>
+    <div class="cell" id="10" onmouseover="currentCell(this);"></div>
+    <div class="cell" id="11" onmouseover="currentCell(this);"></div>
+    <div class="cell" id="12" onmouseover="currentCell(this);"></div>
+    <div class="cell" id="13" onmouseover="currentCell(this);"></div>
+    <div class="cell" id="14" onmouseover="currentCell(this);"></div>
+    <div class="cell" id="15" onmouseover="currentCell(this);"></div>
+    <div class="cell" id="16" onmouseover="currentCell(this);"></div>
+    <div class="cell" id="17" onmouseover="currentCell(this);"></div>
+    <div class="cell" id="18" onmouseover="currentCell(this);"></div>
+    <div class="cell" id="19" onmouseover="currentCell(this);"></div>
+    <div class="cell" id="20" onmouseover="currentCell(this);"></div>
+    <div class="cell" id="21" onmouseover="currentCell(this);"></div>
+    <div class="cell" id="22" onmouseover="currentCell(this);"></div>
+    <div class="cell" id="23" onmouseover="currentCell(this);"></div>
+    <div class="cell" id="24" onmouseover="currentCell(this);"></div>
+    <div class="cell" id="25" onmouseover="currentCell(this);"></div>
+  </div>
+
+  </body>
+
+</html>

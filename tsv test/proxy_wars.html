@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Cold War Proxy Wars</title>
+<link rel="icon" href="globe.png">
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=10" />
+<link rel="stylesheet" type="text/css" href="proxy_wars_style.css"></link>
+<link href="https://fonts.googleapis.com/css?family=Open+Sans" rel="stylesheet">
+<script src="http://vizsociety.net/shared/d3/d3.v3.min.js"></script>
+<script src="http://vizsociety.net/shared/d3/topojson.v1.min.js"></script>
+<script src="http://vizsociety.net/shared/d3/d3.geo.projection.v0.min.js"></script>
+<script src="http://vizsociety.net/shared/js/jquery-1.10.2.js"></script>
+<script src="http://vizsociety.net/shared/js/shared.js"></script>
+<script src="http://vizsociety.net/files/d3viz/lib/d3viz.js"></script>
+
+<script type="text/javascript">
+/* Flexible D3.js global data viewer — by Alex Wellerstein, 2015-2017, v2.0 */
+
+/* MAP OPTIONS */
+
+//creates a new D3 JSON map object
+var map = new d3SVGMap({
+	div: "#map",
+	width: 960,
+	height: window.innerHeight,
+	mapfile: "world-50m.json",
+	projection_name: "robinson",
+	projection_rotate: [0,0,0],
+	projection_scale: 200,
+	projection_translate: [960/2,window.innerHeight/2],
+	graticule_function: d3.geo.graticule(),
+	onload: function() {
+		//this designates what the "tooltip" is going to be
+		map.tooltip = d3.select("#texts")
+					.append("div")
+					.attr("id","tooltip")
+					.text("");
+	}
+});
+
+
+var debug = true; //turn this on if you want it to shoot messages to the console as it does stuff
+var debug_verbose = false; //turn this on if you want a LOT of messages shot to the console
+
+/* DATA SPECIFIC OPTIONS -- you need to tailor these to your dataset */
+
+// NOTE! Anytime you see something like d["something here"], this means
+// that you are referencing a column in the CSV file. The script is smart
+// enough so that it knows that if you put d["something here"] you mean,
+// "access the data in the column whose header (first entry) is 'something here'."
+// So to adapt this to another dataset, you must know the column heads, and find
+// the places in the template below to change it to your own column headings.
+
+//Here is where you should put the data files, in csv format.
+//You can use more than one, as an array, just give it a different number (arrays count from 0, 1, 2, etc.)
+
+//the data file constructor — used for lots of things. You can have more than one, just copy and paste and update the index.
+
+var proxyWarData = new d3Data({
+	name: "Proxy Wars",
+	tsv: "proxy_wars.csv",
+	latLon: function(d) { return [ parseFloat(d["lat"]), parseFloat(d["lon"]) ] }
+})
+
+/* END DATA-SPECIFIC OPTIONS */
+
+//if you want to load any template additional scripts, do it here
+</script>
+<script src="http://vizsociety.net/files/d3viz/lib/data_svgcircles.js"></script>
+<script src="http://vizsociety.net/files/d3viz/lib/mouse_zoomer.js"></script>
+<script type="text/javascript">
+//begin main functions:
+
+//initialization functions go here
+
+var circles = new SVGCircles({
+	//which d3SVGMap map object does this operate on
+	map: map,
+	//what dataset will it use
+	data: proxyWarData,
+	console.log(data)
+	//class assigned to all circles
+	circle_class: "circledata",
+
+	//if you want the radius to be sent by a function (without a selector) uncomment below
+	//	radius: function(d) { return 10; },
+	//you can also set it by a simple value, e.g.:
+	//	radius: 10,
+
+	//this creatures a radius selector -- is optional
+	radius_selector_options: [
+		["Standard", function (d) { return 10 }],
+		["Two", function (d) { return 20 }]
+	],
+	radius_selector_default: 0, //default option selected
+	radius_selector_caption: "Set radius: ", //caption
+
+	//for color set by data, put a field name in here:
+	color_field: "total_deaths",
+	//this is the type of d3 scale that will be used -- see quantitative, ordinal, or time scales here: https://github.com/d3/d3-3.x-api-reference/blob/master/Scales.md
+	scale_function: d3.scale.linear(),
+	//this is a function that maps the scale onto colors. we keep this separate so we can change it based on dynamic updates, if we want
+	color_scale: function(d) {
+		if(typeof this.color_high == "undefined") this.color_high = getCSS("fill","color_high");
+		if(typeof this.color_low == "undefined") this.color_low = getCSS("fill","color_low");
+
+		this.scale_function.domain([
+					d3.min(this.data.data.map(function(d) { return +d[circles.color_field]; })), //minimum for field
+					d3.max(this.data.data.map(function(d) { return +d[circles.color_field]; })) //maximum for field
+				])
+				.range([this.color_low, this.color_high]); //you could change these colors or add more
+		return this.scale_function(d);
+	},
+
+	mouseover_caption: 		//function that determines the caption that is displayed when the mouse hovers over a datapoint
+		function(d) {
+			return  "<b><big>"+d["Engagement"] + "</big></b><br>"+
+					"<em>"+d["Result"]+"</em> <br><br>"
+			},
+	mouseout: //function that runs when mouse leaves a piece of data -- in this case, blank to keep the description up
+		function(d) {
+			return ;
+		},
+
+})
+
+var zoomer = new mouseZoomer({
+	map: map,
+	zoom_if_clicked: ["circle","path"],
+	zoom_to_centroid: false,
+	zoom_transition_speed: 700,
+})
+
+
+//startup (runs after all elements/scripts/etc. on the page have loaded)
+function init() {
+
+	//magic!
+	d3VizObj.load();
+	var css_external = getParameterByName('css');
+	if(css_external) {
+		$('head').append('<link rel="stylesheet" type="text/css" href="'+css_external+'">');
+	}
+}
+window.onload = init;
+
+
+function getCSS (prop, fromClass) {
+    var inspector = $("<div>").css('display', 'none').addClass(fromClass);
+    $("body").append(inspector); // add to DOM, in order to read the CSS property
+    try {
+        return inspector.css(prop);
+    } finally {
+        inspector.remove(); // and remove from DOM
+    }
+};
+
+
+function getParameterByName(name, url) {
+    if (!url) url = window.location.href;
+    name = name.replace(/[\[\]]/g, "\\$&");
+    var regex = new RegExp("[?&]" + name + "(=([^&#]*)|&|#|$)"),
+        results = regex.exec(url);
+    if (!results) return null;
+    if (!results[2]) return '';
+    return decodeURIComponent(results[2].replace(/\+/g, " "));
+}
+
+</script>
+</head>
+<body>
+	<div id="map"></div>
+	<div id="logo"> <img id="symbol" src = "shield.png" align="top"/> Counterfit IQ Association <span id="smaller">| The work of a student. | The center of bad CSS. |&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span> <a id="report" href="https://web.stevens.edu/honor/"> REPORT THREATS </a> </div>
+	<div id="texts">
+		<div id="title">How Cold Was the Cold War?</div>
+		<div id="subtitle">Cold War Proxy Wars, 1945-1991</div>Counterfit
+		<div id="author">by Alex Wellerstein and HST 325-A Fall 2017</div>
+		<hr>
+		<div id="options"></div>
+	</div>
+</body>
+</html>

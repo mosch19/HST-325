@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Flexible data template</title>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=10" />
+<link rel="stylesheet" type="text/css" href="examples.css"></link>
+<script src="http://vizsociety.net/shared/d3/d3.v3.min.js"></script>
+<script src="http://vizsociety.net/shared/d3/topojson.v1.min.js"></script>
+<script src="http://vizsociety.net/shared/d3/d3.geo.projection.v0.min.js"></script>
+<script src="http://vizsociety.net/shared/js/jquery-1.10.2.js"></script>
+<script src="http://vizsociety.net/shared/js/shared.js"></script>
+<script src="../lib/d3viz.js"></script>
+<style>
+
+
+
+</style>
+<script type="text/javascript">
+/* Flexible D3.js global data viewer — by Alex Wellerstein, 2015-2017, v3.0 */
+	
+/* MAP CODE */
+
+//creates a new D3 JSON map object
+var map = new d3SVGMap({
+	div: "#map",
+	width: 960,
+	height: window.innerHeight,
+	mapfile: "../json/world-50m.json",
+	projection_name: "mercator",
+	projection_rotate: [0,0,0], 
+	projection_scale: 200,
+	projection_translate: [960/2,window.innerHeight/2],
+	onload: function() {	
+		//this designates what the "tooltip" is going to be
+		map.tooltip = d3.select("#texts")
+					.append("div")
+					.attr("id","tooltip")
+					.text("");
+
+	},
+	graticule_function: d3.geo.graticule(),
+	
+	loadobjects: ["countries"],
+
+});
+
+/* END MAP CODE */
+
+var debug = true; //turn this on if you want it to shoot messages to the console as it does stuff
+var debug_verbose = false; //turn this on if you want a LOT of messages shot to the console
+
+
+/* DATA CODE */
+
+/* END DATA CODE */
+
+//if you want to load any template additional scripts, do it here 
+</script>
+<script type="text/javascript"> 
+
+/* VISUALIZATION CODE */
+
+
+/* END VISUALIZATION CODE */
+
+/* STARTUP CODE */
+
+//startup (runs after all elements/scripts/etc. on the page have loaded)
+function init() {
+
+	//load it!
+	d3VizObj.load();
+	
+}
+window.onload = init;
+
+/* END STARTUP CODE */
+
+</script>
+</head>
+<body>
+	<div id="map"></div>
+	<div id="texts">
+		<div id="title">A Blank SVG Map</div>
+		<div id="author">By Somebody</div>
+		<div id="options"></div>
+	</div>
+</body>
+</html>

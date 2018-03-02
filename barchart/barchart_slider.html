@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Basic bar chart</title>
+<meta charset="utf-8">
+<!-- Example based on https://bl.ocks.org/mbostock/3885304 -->
+<!-- Generalized and simplified by Alex Wellerstein, http://vizsociety.org -->
+<!-- Version 2.0, September 2017, updated to use D3.js v4 -->
+<style>
+
+/* the "body" of the window */
+body {
+	padding: 0; margin: 0;
+	font-size: 12pt;
+}
+
+#slider {
+	border-radius: 5px;
+}
+/* the info window that has the graph title, description, credits, in it */
+#info {
+	position: absolute;
+	right: 120px;
+	top: 10px;
+	opacity: .5;
+	text-align:right;
+}
+
+#info h1 {
+	padding: 0; margin: 0;
+	font-weight: normal;
+}
+
+#info p {
+	margin: 0;
+}
+
+/* the "bars" of the bar chart */
+.bar {
+	fill: steelblue;
+}
+.bar:hover {
+	fill: brown;
+}
+.northeast {
+	fill: rgb(46, 178, 112);
+}
+.southeast {
+	fill: rgb(249, 51, 39);
+}
+.southwest {
+	fill: rgb(226, 114, 91);
+}
+.west {
+	fill: rgb(247, 238, 64);
+}
+.midwest {
+	fill: rgb(135, 78, 16);
+}
+
+/* the svg element -- all svg graphs live in here */
+#svg_graph {
+	position: absolute;	top: 0px; bottom: 0px; left: 0px; right: 0px; /* fills the entire window */
+	margin: 0; padding: 0; /* no margins, no padding */
+}
+
+#yaxis_label {
+    z-index: 1000;
+}
+
+/* the div the svg element is created inside */
+#graph {
+	position: absolute; top: 0px; bottom: 0px; left: 0px; right: 0px; /* this just makes it fill the window always */
+}
+
+/* the tooltip caption */
+#tooltip {
+	position: absolute;
+	background-color: rgba(255,255,255,.4);
+	border: 1px solid steelblue;
+	display: none;
+	text-align: center;
+	padding-left: 5px;
+	padding-right: 5px;
+	pointer-events: none; /* ignore mouse events -- if not done, can create trouble for things that pop up near the mouse! */
+}
+
+</style>
+<script src="https://d3js.org/d3.v4.min.js"></script>
+<script>
+
+//by putting these variable declarations outside of a function, they have "global" scope and are available to all functions whenever
+var margin, svg, g, tooltip, cdata;
+
+//our main function -- sets everything up once the full HTML DOM is loaded
+function init(year) {
+	// clear the svg so the graph doesn't keep overwriting itself
+	d3.selectAll("svg > *").remove();
+	document.getElementById('year').innerHTML = year;
+  console.log(year);
+  //margins (in pixels)
+	margin = {
+		top: 20,
+		right: 20,
+		bottom: 40,
+		left: 10
+	};
+
+	//add svg element to page
+	svg = d3.select("#graph")
+				.append("svg")
+				.attr("id","svg_graph");
+
+	//create a "group" within the SVG that many of the actual graphic elements will  be added inside of
+	g = svg.append("g")
+		.attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+	//create the group that will hold the x axis
+	g.append("g")
+	  .attr("class", "axis xaxis")
+
+	//create the group that will hold the y axis
+	g.append("g")
+	  .attr("class", "axis yaxis");
+
+	g.append("text") //this is a simple text label for the y axis
+		  .attr("id", "yaxis_label")
+		  .attr("transform", "rotate(-90)")
+		  .attr("y", 6)
+		  .attr("dy", "0.71em")
+		  .attr("text-anchor", "end")
+		  .text("sterilizations");
+
+	// designate the tooltip
+	tooltip = d3.select("#tooltip");
+
+	// load data from a CSV file
+	d3.csv("USA_compulsory_sterilizations.csv", function(error, data) {
+		//this function runs once the data has been received
+
+		//but sometimes there are errors, so we try to account for those
+		if(error) {
+			if(error.status) {
+				alert("Error loading "+error.responseURL+": Error "+error.status+" :"+error.statusText);
+			} else {
+				alert("Error loading data: no error message given. View console for details.");
+			}
+			return false;
+		}
+		cdata = data; //store the data into a global variable so we can use it later
+
+		//create the basic bars -- we aren't doing anything but defining their basic functioning here
+		g.selectAll(".bar")
+            .data(data) //this little function means, "read all of the data we got and bind it to the display elements"
+            .enter().append("rect") //for each piece of data, make a new rectangle
+							.attr("class", function(d) { return d3.select(this).attr("class") + " " + d["region"]; })
+							.classed("bar",true) //sets a class called "bar" -- note that you can set as many classes as you want by adding more "classed" methods (and you "unset" a class with "false" here)
+              .on("mousemove", function(d) { //if mouse is over a bar, trigger a caption
+                //note that the "d" object holds the data for this particular row
+                    tooltip //with the tooltip:
+                      .style("left", d3.event.pageX - 30 + "px") //move the left to where the mouse is
+                      .style("top", d3.event.pageY - 50 + "px") //and the top
+                      .style("display", "block") //make it visible
+                      .html(d["state"] + "<br>" + d[+year]); //finally, set the caption! <br> = line break
+              })
+              .on("mouseout", function(d) { //if mouse leaves a bar, hide the tooltip
+                  tooltip.style("display", "none"); //display: none = hidden
+              })
+		  ; //always end one of these long d3 statements with a semicolon -- technically the whole above is just one line of code
+
+		draw_data(year); //now draw the chart for the firs time based on the data
+	});
+}
+
+//this line tells the page to run the above function with the window loads
+window.onload = start;
+
+function start() {
+  var year = 1942;
+	init(1942);
+	/* timing doesn't work...
+  var t = d3.timer(function() {
+  if (year === 1964) {
+    year = 1942;
+  }
+  console.log(year);
+  init(year);
+  year++;
+}, 1500);
+*/
+}
+
+// draws the data -- we put this here because it will manipulate the data "on the fly", and so can be re-called whenever resized
+function draw_data(year) {
+	//get current window size
+	width = window.innerWidth-20;
+	height = window.innerHeight-15;
+
+	//modify the svg element
+	svg
+		.attr("width", width)
+		.attr("height",height)
+		.attr("viewBox","-"+margin.left+" -"+margin.top+" "+(width+margin.left+margin.right)+" "+(height+margin.top+margin.bottom)); //this last line makes it resize along with the browser window
+	// set the types of scales that are being used
+	// this is important! it tells D3 how to understand what kind of data it is
+
+	//  scaleBand = discrete categories  --- https://github.com/d3/d3-scale/blob/master/README.md#scaleBand
+	//  scaleLinear = scale by linear values --- https://github.com/d3/d3-scale/blob/master/README.md#scaleLinear
+
+	// see https://github.com/d3/d3/blob/master/API.md#scales-d3-scale for more scales!
+
+    x = d3.scaleBand().rangeRound([0, width]).padding(0.1);
+    y = d3.scaleLinear().rangeRound([height, 0]);
+
+	//tell D3's scales how to understand the data:
+    x.domain(cdata.map(function(d) { return d["state"]; } ));
+    y.domain([0, d3.max(cdata, function(d) { return parseInt(d[year]); })]);
+		// returning 98 as the max of the sterilizaitions column
+// console.log(d3.max(cdata, function(d) { return parseInt(d["sterilizations"]); }))
+    //create the x axis
+    g.select(".xaxis")
+      .attr("transform", "translate(0," + height + ")") //moves this to the bottom
+      .call(d3.axisBottom(x)) //specifies the kind of axis this is (bottom)
+    ;
+
+    //create the y axis
+    g.select(".yaxis")
+      .call(d3.axisLeft(y).ticks(10, "d")) //specifies the kind of axis (left), but also details how tick labeling should work
+    ;
+
+    //now we go over all the data and make it the right size
+    g.selectAll(".bar")
+      .attr("x", function(d) { return x(d["state"]); })  //set the x value from the data
+      .attr("y", function(d) { return y(d[parseInt(year)]); }) //set the y value from the data
+      .attr("width", x.bandwidth()) //set the width of the rectangle based on the scale
+      .attr("height", function(d) { return height - y(d[+year]); }) //and set the height too
+    ;
+};
+
+// call the draw function whenever a resize event occurs
+d3.select(window).on('resize', draw_data);
+
+//all done!
+</script>
+</head>
+<body>
+	<!--had to reorder elements so the slider is accessible!-->
+<div id="graph"></div>
+<div id="info">
+	<h1>US Compulsory sterilizations:</h1>
+	<p id="year"> Year </p>
+  <input type="range" min="1942" max="1963" value="1942" class="slider" id="slider" onchange="init(this.value)">
+</div>
+<div id="tooltip"></div>
+</body>
+</html>

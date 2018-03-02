@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Flexible data template</title>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=10" />
+<link rel="stylesheet" type="text/css" href="examples.css"></link>
+<script src="http://vizsociety.net/shared/d3/d3.v3.min.js"></script>
+<script src="http://vizsociety.net/shared/d3/topojson.v1.min.js"></script>
+<script src="http://vizsociety.net/shared/d3/d3.geo.projection.v0.min.js"></script>
+<script src="http://vizsociety.net/shared/js/jquery-1.10.2.js"></script>
+<script src="http://vizsociety.net/shared/js/shared.js"></script>
+<script src="../lib/d3viz.js"></script>
+
+<script type="text/javascript">
+/* Flexible D3.js global data viewer — by Alex Wellerstein, 2015-2016, v2.0 */
+	
+/* MAP OPTIONS */
+
+//creates a new D3 JSON map object
+var map = new d3SVGMap({
+	div: "#map",
+	width: 960,
+	height: window.innerHeight,
+	mapfile: "../json/us.counties.json",
+	projection_name: "albersUsa",
+	//projection_rotate: [0,0,0], //don't rotate the albersUsa projection or else it won't work
+	projection_scale: 1280,
+	projection_translate: [960/2,window.innerHeight/2],
+
+	loadobjects: ["states"], 
+
+	onload: function() {	
+		//this designates what the "tooltip" is going to be
+		map.tooltip = d3.select("#texts")
+					.append("div")
+					.attr("id","tooltip")
+					.text("");
+	},
+
+	graticule_function: d3.geo.graticule(),
+
+});
+
+var debug = true; //turn this on if you want it to shoot messages to the console as it does stuff
+var debug_verbose = false; //turn this on if you want a LOT of messages shot to the console
+
+
+/* DATA SPECIFIC OPTIONS -- you need to tailor these to your dataset */
+
+// NOTE! Anytime you see something like d["something here"], this means
+// that you are referencing a column in the CSV file. The script is smart
+// enough so that it knows that if you put d["something here"] you mean,
+// "access the data in the column whose header (first entry) is 'something here'."
+// So to adapt this to another dataset, you must know the column heads, and find
+// the places in the template below to change it to your own column headings.
+
+
+//Here is where you should put the data files, in csv format. 
+
+var cityData = new d3Data({
+	name: "Selected populations of several large US cities, 1890-1990",
+	csv: "../data/USA_cities_populations.csv",
+	latLon: function(d) { return [ parseFloat(d["lat"]), parseFloat(d["lon"]) ] }
+})
+
+//if you want to load any template additional scripts, do it here 
+</script>
+<script src="../lib/data_datacircles.js"></script>
+<script src="../lib/data_timeline.js"></script>
+<script src="../lib/mouse_zoomer.js"></script>
+
+<script type="text/javascript"> 
+//begin main functions:
+
+//initialization functions go here
+
+//set up a color scale
+var color_linear = d3.scale.linear()
+    .domain([0,.1,.2,.3]) //value points
+    .range(["white", "steelblue", "navy","black"]); //colors that correspond with domain
+
+var circles = new dataCircles({
+	map: map,
+	data: cityData,
+	color: "red", //just set the color for now
+	circle_class: "circledata",
+	mouseover_caption: 		//function that determines the caption that is displayed when the mouse hovers over a datapoint
+		function(d) {
+			//this is just a function that lists all the data for this entry
+			var c = "<b><big>"+d["name"] + "</big></b><br>"
+				//cycles over each year, grabs the column info
+					for(var x=1890;x<=1990;x=x+10) {
+						if(x==1890) { //this little bit of code sets the color of the value based on whether it is more or less than the previous decade
+							var cc = "green";
+						} else {
+							if(+d[x]>+d[x-10]) {
+								var cc = "green";
+							} else {
+								var cc = "red";
+							}
+						}
+						c+="<b>"+x+":</b> <span style='color:"+cc+";'>"+addCommas(d[x])+"</span><br>";
+					}
+				return c;	
+			},
+	radius: function(d) { return +d["1990"]/100000;}, //just a default size to load it at to begin
+})
+
+var timeline = new Timeline({
+	map: map,
+	data: cityData,
+	startDate: [1890,1,1], //an array that says what day to start. Fields are (in order), YEAR, MONTH, DAY, HOUR, MINUTE, SECOND. If you don't want to track a given period of time, you can leave it out, or leave it as 0.
+	stopDate:  [1990,1,1], //same as the above, but for the stop date. 
+	dateTick:  [  10,0,0], //how much should each "tick" of the animation counter advance the date? Same format as above, so 0,0,1,0,0,0 would advance the timer one day per tick
+	//dateInfo: //important function! tells the script how to interpret the date. should take in whatever date field, return an array of [year,month,day]. If month/day don't matter, have them return 0,0
+	//the above is blocked out because for this mode, we will not be using a date field, but a date column
+	animatorAttachId: "options", //id of whatever element the play/pause/reset button should be attached to (if any)
+	onDateTick:  //function that is triggered each time the date ticks — could update a caption, for example
+		function(currentDate) { 
+			if((currentDate[0]-10)>1890) {
+				circles.color = function(d) {
+					if(+d[currentDate[0]-10]>+d[currentDate[0]]) {
+						return "red";
+					} else {
+						return "green";
+					}
+				}
+			} else {
+				circles.color = "green";
+			}
+			circles.radius = function(d) { return +d[currentDate[0]]/100000;} //because the column names are years, we can just change which column is used for the radius
+			circles.updateRadius(false); //passing "false" here will cause it to just update based on the above function
+			document.getElementById("date_status").innerHTML = currentDate[0]; //set the year caption
+		},
+	//svgElement: "#circles circle", //the svg element to toggle visibility classes on or off as it animates (optional! if you don't have one, though, you'd better have something happen in the onDateTick function or else it won't do anything interesting)
+ 	sliderAttachId: "slider", //the id of the html element to attach a slider to, if you want one
+ 	loop: true, //makes the timeline loop forever...
+ });
+
+
+var zoomer = new mouseZoomer({
+	map: map,
+	zoom_if_clicked: ["circle","path"],
+	zoom_to_centroid: false,
+	zoom_transition_speed: 700,	
+})
+
+//startup (runs after all elements/scripts/etc. on the page have loaded)
+function init() {
+
+	//do it!
+	d3VizObj.load();
+	
+}
+window.onload = init;
+
+</script>
+</head>
+<body>
+	<div id="map"></div>
+	<div id="texts">
+		<div id="title">Big US cities, 1890-1990</div>
+		<div id="author">by Alex Wellerstein</div>
+		<hr>
+		<div id="options">
+		<div id="slider"></div><div id="date_status">1990</div>
+		</div>
+		<p>An example that shows how a timeline element can be used to change a circle element's radius.</p>
+
+	</div>
+</body>
+</html>

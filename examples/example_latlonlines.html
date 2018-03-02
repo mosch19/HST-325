@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Flexible data template</title>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=10" />
+<link rel="stylesheet" type="text/css" href="examples.css"></link>
+<script src="http://vizsociety.net/shared/d3/d3.v3.min.js"></script>
+<script src="http://vizsociety.net/shared/d3/topojson.v1.min.js"></script>
+<script src="http://vizsociety.net/shared/d3/d3.geo.projection.v0.min.js"></script>
+<script src="http://vizsociety.net/shared/js/jquery-1.10.2.js"></script>
+<script src="http://vizsociety.net/shared/js/shared.js"></script>
+<script src="../lib/d3viz.js"></script>
+<style>
+
+/* simple example of how you can use stylesheet to change appearance */
+
+.line_0 {
+	stroke-opacity: .5;
+}
+.linegroup_0_LGA {
+	stroke: blue;
+}
+.linegroup_0_JFK {
+	stroke: red;
+}
+.linegroup_0_EWR {
+	stroke: green;
+}
+
+</style>
+<script type="text/javascript">
+/* Flexible D3.js global data viewer — by Alex Wellerstein, 2015-2016, v2.0 */
+	
+/* MAP OPTIONS */
+
+//creates a new D3 JSON map object
+var map = new d3SVGMap({
+	div: "#map",
+	width: 960,
+	height: window.innerHeight,
+	mapfile: "../json/world-50m.json",
+	projection_name: "mercator",
+	projection_rotate: [100,-40,0], //don't rotate the albersUsa projection or else it won't work
+	projection_scale: 800,
+	projection_translate: [960/2,window.innerHeight/2],
+
+	loadobjects: ["land","countries"],
+
+	debug: true,
+	onload: function() {	
+		//this designates what the "tooltip" is going to be
+		map.tooltip = d3.select("#texts")
+					.append("div")
+					.attr("id","tooltip")
+					.text("");
+	},
+
+	graticule_function: d3.geo.graticule(),
+
+
+});
+
+var debug = true; //turn this on if you want it to shoot messages to the console as it does stuff
+var debug_verbose = false; //turn this on if you want a LOT of messages shot to the console
+
+
+/* DATA SPECIFIC OPTIONS -- you need to tailor these to your dataset */
+
+// NOTE! Anytime you see something like d["something here"], this means
+// that you are referencing a column in the CSV file. The script is smart
+// enough so that it knows that if you put d["something here"] you mean,
+// "access the data in the column whose header (first entry) is 'something here'."
+// So to adapt this to another dataset, you must know the column heads, and find
+// the places in the template below to change it to your own column headings.
+
+
+//Here is where you should put the data files, in csv format. 
+
+var airportData = new d3Data({
+	name: "NYC airports top domestic destinations",
+	csv: "../data/nyc_airports_top_domestic_destinations.csv",
+})
+
+var airportDataTotals = new d3Data({
+	name: "NYC airports top domestic destinations (totals)",
+	csv: "../data/nyc_airports_top_domestic_destinations_totals.csv",
+})
+
+
+//note that this dataset does not have a latLon constructor -- it doesn't use that, so we just omit it
+
+/* END DATA-SPECIFIC OPTIONS */
+
+//if you want to load any template additional scripts, do it here 
+</script>
+<script src="../lib/data_paths.js"></script>
+<script src="../lib/data_datacircles.js"></script>
+<script src="../lib/mouse_zoomer.js"></script>
+<script type="text/javascript"> 
+//begin main functions:
+
+//initialization functions go here
+
+//draw lines
+var lines = new SVGPath({
+	map: map,
+
+	data: airportData,
+
+	group_by: "airport", //this makes it class all lines together based on a shared value in this field 
+
+	lineLatLons: function(d) { //gives it a series of lat/lon points
+		//in this case, we need to take lat/lons from two fields in the data, where they are a single column each
+		var latlon1 = d["source_latlon"].split(","); //split breaks text into an array using a character delimiter -- in this case a comma
+		var latlon2 = d["dest_latlon"].split(",");
+		//the return needs to be an array of arrays, e.g. [ [lat1,lon1], [lat2,lon2], [lat3,lon3] ] and so on. In this example we only have two points but we could have an arbitrary number
+		return [ [parseFloat(latlon1[0]), parseFloat(latlon1[1])] , [parseFloat(latlon2[0]), parseFloat(latlon2[1])]];
+	},
+
+	strokeWidth: function(d) { //sets the width of the line (in pixels)
+		return Math.max(1,d["passengers"]/100000); //in this case, make it relative to total passengers, but never less than 1 px
+	},
+
+	mouseover_caption: 		//function that determines the caption that is displayed when the mouse hovers over a datapoint
+		function(d,i,obj,line_id,shape) {
+			d3.select(shape).classed("mouseover",true);
+			d3.select("#d_"+circles.id+"_"+i).classed("mouseover",true); //also select the destination circle
+			var ll = lines.lineLatLons(d);
+			return "<big>"+d["source_airport"]+" &rarr; "+ d["dest_airport"] + "</big><br>"+
+				"Passengers: "+addCommas(d["passengers"])+"<br>"+
+				"Top carriers: "+d["top carriers"]+"<br>"+
+				"Flight distance: "+addCommas(Math.round(distanceBetweenPoints(ll[0][0],ll[0][1],ll[1][0],ll[1][1])*0.621371))+" mi"
+				;	
+			},
+
+	mouseout: function(d,i,obj,line_id,shape) { //called when the mouse moves away from a line
+			d3.select(shape).classed("mouseover",false);
+			d3.select("#d_"+circles.id+"_"+i).classed("mouseover",false); //also select the destination circle
+	}
+})
+
+
+var circles = new dataCircles({
+	map: map,
+
+	data: airportDataTotals,
+
+	latLon: function(d) {
+		var latlon = d["latlon"].split(",");
+		return [ parseFloat(latlon[0]), parseFloat(latlon[1]) ];
+	},
+
+	color_scale: d3.scale.category20(),
+	
+	color_field: "airport",
+	
+	radius: function(d) { return d["total_passengers"]/100000/2; },
+
+	circle_class: "circledata",
+
+	mouseover_caption: 		//function that determines the caption that is displayed when the mouse hovers over a datapoint
+		function(d,i) {
+			return "<big>"+d["airport"]+"</big><br>"+
+				"Passengers: "+addCommas(d["total_passengers"])
+				;	
+			},
+
+})
+
+var zoomer = new mouseZoomer({
+	map: map,
+	zoom_if_clicked: ["circle","path"],
+	zoom_transition_speed: 0,	
+})
+
+//startup (runs after all elements/scripts/etc. on the page have loaded)
+function init() {
+
+	//load it!
+	d3VizObj.load();
+	
+}
+window.onload = init;
+
+</script>
+</head>
+<body>
+	<div id="map"></div>
+	<div id="texts">
+		<div id="title">NYC airports top domestic destinations</div>
+		<div id="author">by Alex Wellerstein</div>
+		<hr>
+		<div id="options"></div>
+	</div>
+</body>
+</html>

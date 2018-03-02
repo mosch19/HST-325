@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Flexible data template</title>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=10" />
+<link rel="stylesheet" type="text/css" href="examples.css"></link>
+<script src="http://vizsociety.net/shared/d3/d3.v3.min.js"></script>
+<script src="http://vizsociety.net/shared/d3/topojson.v1.min.js"></script>
+<script src="http://vizsociety.net/shared/d3/d3.geo.projection.v0.min.js"></script>
+<script src="http://vizsociety.net/shared/js/jquery-1.10.2.js"></script>
+<script src="http://vizsociety.net/shared/js/shared.js"></script>
+<script src="../lib/d3viz.js"></script>
+
+<script type="text/javascript">
+/* Flexible D3.js global data viewer — by Alex Wellerstein, 2015-2016, v2.0 */
+	
+/* MAP OPTIONS */
+
+//creates a new D3 JSON map object
+var map = new d3SVGMap({
+	div: "#map",
+	width: 960,
+	height: window.innerHeight,
+	mapfile: "../json/us.counties.json",
+	projection_name: "mercator",	
+	projection_rotate: [73.94,-40.7,0],
+	projection_scale: 60000,
+	projection_translate: [960/2,window.innerHeight/2],
+	onload: function() {	
+		//this designates what the "tooltip" is going to be
+		map.tooltip = d3.select("#texts")
+					.append("div")
+					.attr("id","tooltip")
+					.text("");
+
+	},
+
+	loadobjects: ["counties"], //the us.counties.json map has three layers -- land, states, counties. we only want counties for this map.
+	
+	setid: function(d) { //and we want to make sure every item on the map has an id assigned
+		return "c_"+d.id;
+	},
+
+
+});
+
+var debug = true; //turn this on if you want it to shoot messages to the console as it does stuff
+var debug_verbose = false; //turn this on if you want a LOT of messages shot to the console
+
+
+/* DATA SPECIFIC OPTIONS -- you need to tailor these to your dataset */
+
+// NOTE! Anytime you see something like d["something here"], this means
+// that you are referencing a column in the CSV file. The script is smart
+// enough so that it knows that if you put d["something here"] you mean,
+// "access the data in the column whose header (first entry) is 'something here'."
+// So to adapt this to another dataset, you must know the column heads, and find
+// the places in the template below to change it to your own column headings.
+
+
+//Here is where you should put the data files, in csv format. 
+
+var unemploymentData = new d3Data({
+	name: "US unemployment by county",
+	csv: "../data/US_unemployment_by_county.csv",
+})
+//note that this dataset does not have a latLon constructor -- it doesn't use that, so we just omit it
+
+/* END DATA-SPECIFIC OPTIONS */
+
+//if you want to load any template additional scripts, do it here 
+</script>
+
+<script src="../lib/data_paths.js"></script>
+<script src="../lib/data_choropleth.js"></script>
+
+<script src="../lib/mouse_zoomer.js"></script>
+
+<script type="text/javascript"> 
+//begin main functions:
+
+//initialization functions go here
+
+var geopath = new SVGPath({
+	map: map, 
+	geoJSON: "../json/nyc.json",
+	debug: true,
+
+	each:  function(d,i,obj) {
+				d3.select(obj)
+					.style("fill",function(d) {
+						switch(d.properties.boroughCode) { // just using some example of the geoJSON data, and tailoring a property as a result of it -- you could also use things like the choropleth script for this
+							case 1: return "blue"; break;
+							case 2: return "red"; break;
+							case 3: return "yellow"; break;
+							case 4: return "green"; break;
+							case 5: return "purple"; break;
+						}
+					})
+					.style("fill-opacity",.5)
+					.style("stroke","red")
+	},
+
+	caption_id: "tooltip",
+
+	mouseover_caption: 	
+		function(d,shape) {  // d = path object's own data, shape = d3 pointer to shape itself
+			return d.properties.borough;
+		;
+	},
+}) 
+
+//create a choropleth visualization
+var choropleth = new SVGChoropleth({
+
+	data: unemploymentData, //dataset used to associate ids and data
+
+	id_field: function(d) { return "c_"+d["countyid"] },	//function that returns the field in the dataset that corresponds to the ids to color
+
+	color_field: function(d) { return d["rate"] }, //function that returns the value in the dataset that determines what color each part of the map should be colored
+
+	color_scale: d3.scale.linear() //the function that determines what colors to assign to the map based on value
+    				.domain([0,.1,.2,.3]) //value points
+    				.range(["white", "steelblue", "navy","black"])
+    , 
+    
+    color_target: "fill", //the entity to color
+
+	mouseover_caption: 		//function that determines the caption that is displayed when the mouse hovers over a colored part of the map
+		function(d,feature,obj) { //d = the associated piece of data (from the data set) associated with the shape feature; feature = the shape feature's own data; obj = the d3 object of the shape feature
+				return county_name(d["countyid"])+" (#"+d["countyid"]+")<br><b>"+(Math.round(d["rate"]*100))+"%</b> unemployment rate<br>"
+		;	
+	},
+	
+	caption_id: "tooltip", //necessary for mouseover captions, etc.
+	
+})
+
+
+var zoomer = new mouseZoomer({
+	map: map,
+	zoom_if_clicked: ["path"],
+	zoom_to_centroid: false,
+	zoom_transition_speed: 700,	
+	zoom_factor: 10, //makes this zoom in a lot more than default (which is 3)
+})
+
+//startup (runs after all elements/scripts/etc. on the page have loaded)
+function init() {
+
+	//load it!
+	d3VizObj.load();
+	
+}
+window.onload = init;
+
+</script>
+</head>
+<body>
+	<div id="map"></div>
+	<div id="texts">
+		<div id="title">GeoJSON path example</div>
+		<div id="author">by Alex Wellerstein</div>
+		<hr>
+		<div id="options"></div>
+		<p>Sometimes data comes in the form of geoJSON paths, but isn't the base map you want to use (or maybe you don't even want to use a base map). In this case, we've set up a base map (which is very "chunky" because it is not meant to be zoomed-in this far), but we've also loaded a separate geoJSON file (in this case, the outlines of the New York City boroughs) on top of it. This is an example of the SVGPath constructor being used to load arbitrary geoJSON data.</p>
+	</div>
+</body>
+</html>
